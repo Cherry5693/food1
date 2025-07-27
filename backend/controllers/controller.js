@@ -1,3 +1,4 @@
+// controller.js
 const { User, Product, Order, GroupOrder } = require('../models/model');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -107,7 +108,7 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-// NEW Group Order Controller
+// Group Order Controller
 exports.createGroupOrder = async (req, res) => {
   try {
     const { productId, targetQty, quantity } = req.body;
@@ -191,6 +192,73 @@ exports.getGroupOrders = async (req, res) => {
     
     res.json({ data: transformedOrders });
 
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+// NEW: Functions for Order Tracking and Modification
+// Add these two functions to your controller
+exports.getOrderTracking = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const groupOrder = await GroupOrder.findById(orderId);
+
+    if (!groupOrder) {
+      return res.status(404).json({ msg: 'Group order not found' });
+    }
+
+    // This is sample tracking data. You would fetch this from a real source.
+    const trackingData = {
+      status: groupOrder.status,
+      estimatedDelivery: groupOrder.deliveryDate,
+      events: [
+        { status: 'Order Placed', timestamp: new Date() },
+        // Add more stages based on your real-world logic
+      ]
+    };
+
+    res.json({ data: trackingData });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+exports.modifyOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { quantity: newQuantity } = req.body;
+    const { id: userId } = req.user;
+
+    const groupOrder = await GroupOrder.findById(orderId);
+    if (!groupOrder) {
+      return res.status(404).json({ msg: 'Group order not found' });
+    }
+
+    if (groupOrder.status !== 'open') {
+      return res.status(400).json({ msg: 'Order is no longer open and cannot be modified' });
+    }
+    
+    const participant = groupOrder.participants.find(p => p.user.toString() === userId);
+    if (!participant) {
+      return res.status(403).json({ msg: 'User is not a participant in this order' });
+    }
+    
+    const oldQuantity = participant.quantity;
+    const quantityDifference = newQuantity - oldQuantity;
+
+    if (groupOrder.currentQty + quantityDifference > groupOrder.targetQty) {
+      return res.status(400).json({ msg: 'New quantity exceeds the maximum for this group order' });
+    }
+
+    // Update quantities
+    participant.quantity = newQuantity;
+    groupOrder.currentQty += quantityDifference;
+
+    // Save the modified order
+    await groupOrder.save();
+
+    res.json(groupOrder);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
