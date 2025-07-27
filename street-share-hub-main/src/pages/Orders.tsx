@@ -9,6 +9,8 @@ import { useAuth } from '@/context/AuthContext';
 import { GroupOrder, Product } from '@/types';
 import * as orderService from '../services/orderService';
 import JoinOrderDialog from '@/components/JoinOrderDialog';
+import OrderTrackingDialog from '@/components/OrderTrackingDialog'; 
+import ModifyOrderDialog from '@/components/ModifyOrderDialog';
 import {
   ShoppingCart,
   Clock,
@@ -17,16 +19,15 @@ import {
   Users,
   Calendar,
   IndianRupee,
-  Package
+  Package,
+  Boxes
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const Orders = () => {
   function isGroupOrder(order: any): order is GroupOrder {
-    // This type guard is still useful for data validation
     return order && typeof order === 'object' && ('_id' in order || 'id' in order);
   }
-
   function isParticipantObject(p: any): p is { user: string; quantity: number } {
     return p && typeof p === 'object' && 'user' in p && 'quantity' in p;
   }
@@ -34,54 +35,36 @@ const Orders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<GroupOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // State for dialogs
   const [showJoinOrderDialog, setShowJoinOrderDialog] = useState(false);
   const [selectedProductForJoin, setSelectedProductForJoin] = useState<Product | null>(null);
+  const [showTrackOrderDialog, setShowTrackOrderDialog] = useState(false);
+  const [showModifyOrderDialog, setShowModifyOrderDialog] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<GroupOrder | null>(null);
 
-  // const fetchOrders = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const res = await orderService.getGroupOrders();
-  //     // FIXED: Explicitly casting res.data to an array of GroupOrder objects
-  //     // This tells TypeScript what the shape of the data is
-  //     const data = res.data as GroupOrder[] || [];
-  //     setOrders(data.filter(isGroupOrder));
-  //   } catch (err: any) {
-  //     console.error("Failed to fetch group orders:", err.response?.data?.msg || err.message);
-  //     toast({
-  //       title: "Error fetching orders",
-  //       description: err.response?.data?.msg || "Could not load your orders. Please try again.",
-  //       variant: "destructive"
-  //     });
-  //     setOrders([]);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
   const fetchOrders = async () => {
-  setLoading(true);
-  try {
-    const res = await orderService.getGroupOrders();
-    // FIXED: Access res.data.data instead of res.data
-    const data = (res.data.data as GroupOrder[]) || []; 
-    setOrders(data.filter(isGroupOrder));
-  } catch (err: any) {
-    console.error("Failed to fetch group orders:", err.response?.data?.msg || err.message);
-    toast({
-      title: "Error fetching orders",
-      description: err.response?.data?.msg || "Could not load your orders. Please try again.",
-      variant: "destructive"
-    });
-    setOrders([]);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const res = await orderService.getGroupOrders();
+      const data = (res.data.data as GroupOrder[]) || []; 
+      setOrders(data.filter(isGroupOrder));
+    } catch (err: any) {
+      console.error("Failed to fetch group orders:", err.response?.data?.msg || err.message);
+      toast({
+        title: "Error fetching orders",
+        description: err.response?.data?.msg || "Could not load your orders. Please try again.",
+        variant: "destructive"
+      });
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchOrders();
   }, []);
-
-  const getOrderId = (order: GroupOrder) => order.id || (order as any).id;
 
   const userOrders = orders.filter(order =>
     order.participants?.some(p => {
@@ -118,6 +101,15 @@ const Orders = () => {
     }
   };
 
+  const handleTrackOrderClick = (order: GroupOrder) => {
+    setSelectedOrder(order);
+    setShowTrackOrderDialog(true);
+  };
+  const handleModifyOrderClick = (order: GroupOrder) => {
+    setSelectedOrder(order);
+    setShowModifyOrderDialog(true);
+  };
+  
   const OrderCard = ({ order }: { order: GroupOrder }) => {
     const progressPercentage = (order.currentQty / order.targetQty) * 100;
     const userParticipation = order.participants?.find(p => {
@@ -128,71 +120,79 @@ const Orders = () => {
     });
     
     return (
-      <Card key={getOrderId(order)} className="hover:shadow-lg transition-shadow">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-lg">{order.productName}</CardTitle>
-              <CardDescription>by {order.supplierName}</CardDescription>
-            </div>
-            <Badge variant={getStatusColor(order.status) as any} className="flex items-center space-x-1">
-              {getStatusIcon(order.status)}
-              <span className="capitalize">{order.status}</span>
-            </Badge>
+      <Card key={order._id || (order as any).id} className="hover:shadow-lg transition-shadow">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-bold">{order.productName}</CardTitle>
+            <CardDescription className="text-sm">by {order.supplierName}</CardDescription>
           </div>
+          <Badge variant={getStatusColor(order.status) as any} className="flex items-center space-x-1">
+            {getStatusIcon(order.status)}
+            <span className="capitalize">{order.status}</span>
+          </Badge>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Order Progress</span>
-              <span>{order.currentQty}kg / {order.targetQty}kg</span>
+              <span className="font-medium text-muted-foreground">Order Progress</span>
+              <span className="font-semibold text-foreground">{order.currentQty}kg / {order.targetQty}kg</span>
             </div>
             <Progress value={progressPercentage} className="h-2" />
           </div>
 
-          {userParticipation && isParticipantObject(userParticipation) && (
-            <Card className="bg-secondary/20">
-              <CardContent className="p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Your Order:</span>
-                  <div className="text-right">
-                    <div className="flex items-center space-x-1">
-                      <span className="font-semibold">{userParticipation.quantity}kg</span>
-                    </div>
-                    <div className="flex items-center space-x-1 text-sm text-primary">
-                      <IndianRupee className="w-3 h-3" />
-                      <span>{(userParticipation.quantity * (order.pricePerKg || 0)).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="flex items-center space-x-1">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span>{order.participants?.length || 0} members</span>
+          <div className="grid grid-cols-2 gap-y-2 text-sm text-muted-foreground border-t border-dashed pt-4">
+            <div className="flex items-center space-x-2">
+              <IndianRupee className="w-4 h-4" />
+              <span>Price: <span className="font-semibold text-foreground">{order.pricePerKg}/kg</span></span>
             </div>
-            <div className="flex items-center space-x-1">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center space-x-2">
+              <Users className="w-4 h-4" />
+              <span>Members: <span className="font-semibold text-foreground">{order.participants?.length || 0}</span></span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4" />
               <span>
-                {order.deliveryDate && new Date(order.deliveryDate).toLocaleDateString()}
+                Delivery Date: <span className="font-semibold text-foreground">{order.deliveryDate && new Date(order.deliveryDate).toLocaleDateString()}</span>
               </span>
             </div>
-            <div className="flex items-center space-x-1">
-              <IndianRupee className="w-4 h-4 text-muted-foreground" />
-              <span>{(order.pricePerKg || 'N/A')}/kg</span>
-            </div>
           </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1">
+          
+          {userParticipation && isParticipantObject(userParticipation) && (
+            <div className="border border-dashed p-4 rounded-md bg-muted/30">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-2 text-primary">
+                  <Boxes className="w-4 h-4" />
+                  <span className="font-semibold">Your Contribution</span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center space-x-1 font-bold text-lg text-foreground">
+                    <span>{userParticipation.quantity}kg</span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                    <IndianRupee className="w-3 h-3" />
+                    <span>{(userParticipation.quantity * (order.pricePerKg || 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex gap-2 pt-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => handleTrackOrderClick(order)}
+            >
               <Truck className="w-4 h-4 mr-2" />
               Track Order
             </Button>
             {order.status === 'open' && (
-              <Button size="sm" className="flex-1">
+              <Button 
+                size="sm" 
+                className="flex-1"
+                onClick={() => handleModifyOrderClick(order)}
+              >
                 Modify Order
               </Button>
             )}
@@ -201,38 +201,17 @@ const Orders = () => {
       </Card>
     );
   };
-
+  
   const activeOrders = userOrders.filter(order => order.status === 'open');
   const completedOrders = userOrders.filter(order => order.status === 'delivered');
   const processingOrders = userOrders.filter(order => order.status === 'closed');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
+    <div className="min-h-screen bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">My Orders</h1>
           <p className="text-muted-foreground">Track and manage your group orders</p>
-          <Button 
-            onClick={() => {
-              const dummyProduct: Product = {
-                id: '60c72b2f9b1e8b0015f8e3d1',
-                name: 'Organic Apples',
-                pricePerKg: 120,
-                supplierId: 'someSupplierId',
-                supplierName: 'Green Farms',
-                category: 'Fruits',
-                unit: 'kg',
-                minOrderQty: 5,
-                description: 'Fresh organic apples',
-                imageUrl: 'https://placehold.co/400x300/E0F2F1/004D40?text=Apples'
-              };
-              setSelectedProductForJoin(dummyProduct);
-              setShowJoinOrderDialog(true);
-            }}
-            className="mt-4"
-          >
-            Open Join Dialog (Demo)
-          </Button>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -286,7 +265,7 @@ const Orders = () => {
             ) : activeOrders.length > 0 ? (
               <div className="grid lg:grid-cols-2 gap-6">
                 {activeOrders.map((order) => (
-                  <OrderCard key={getOrderId(order)} order={order} />
+                  <OrderCard key={order._id || (order as any).id} order={order} />
                 ))}
               </div>
             ) : (
@@ -307,7 +286,7 @@ const Orders = () => {
             {processingOrders.length > 0 ? (
               <div className="grid lg:grid-cols-2 gap-6">
                 {processingOrders.map((order) => (
-                  <OrderCard key={getOrderId(order)} order={order} />
+                  <OrderCard key={order._id || (order as any).id} order={order} />
                 ))}
               </div>
             ) : (
@@ -325,7 +304,7 @@ const Orders = () => {
             {completedOrders.length > 0 ? (
               <div className="grid lg:grid-cols-2 gap-6">
                 {completedOrders.map((order) => (
-                  <OrderCard key={getOrderId(order)} order={order} />
+                  <OrderCard key={order._id || (order as any).id} order={order} />
                 ))}
               </div>
             ) : (
@@ -345,6 +324,17 @@ const Orders = () => {
         product={selectedProductForJoin}
         isOpen={showJoinOrderDialog}
         onClose={() => setShowJoinOrderDialog(false)}
+        onOrderUpdated={fetchOrders}
+      />
+      <OrderTrackingDialog
+        isOpen={showTrackOrderDialog}
+        onClose={() => setShowTrackOrderDialog(false)}
+        groupOrderId={selectedOrder?._id || ''}
+      />
+      <ModifyOrderDialog
+        isOpen={showModifyOrderDialog}
+        onClose={() => setShowModifyOrderDialog(false)}
+        order={selectedOrder}
         onOrderUpdated={fetchOrders}
       />
     </div>
