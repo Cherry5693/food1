@@ -1,0 +1,4 @@
+[build]
+  base = "street-share-hub-main"
+  publish = "street-share-hub-main/build"
+  command = "npm run build"
