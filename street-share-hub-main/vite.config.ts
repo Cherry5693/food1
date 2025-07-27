@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000', // or wherever your backend runs
+        target: 'https://food-iw9p.onrender.com', // or wherever your backend runs
         changeOrigin: true,
         secure: false,
       },
