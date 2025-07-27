@@ -14,8 +14,15 @@ router.get('/users', auth, controller.getUsers);
 router.post('/products', auth, controller.createProduct);
 router.get('/products', controller.getProducts);
 
-// Orders
+// Group Orders
+router.post('/group-orders', auth, controller.createGroupOrder); 
+router.post('/group-orders/join', auth, controller.joinGroupOrder); 
+
+// FIXED: Add the 'auth' middleware here to protect the route
+router.get('/group-orders', auth, controller.getGroupOrders); 
+
+// Regular Orders
 router.post('/orders', auth, controller.createOrder);
 router.get('/orders', auth, controller.getOrders);
 
-module.exports = router; 
+module.exports = router;

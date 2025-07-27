@@ -1,12 +1,16 @@
-import axios from 'axios';
-import { getToken } from './authService';
+import axios from './axiosConfig'; // This file now exists
+import { GroupOrder } from '@/types';
 
-const API_URL = '/api/orders';
+// The return type is inferred by TypeScript, which is often sufficient
+// to prevent the error in the consuming component.
+export const getGroupOrders = async () => {
+  return await axios.get<{ data: GroupOrder[] }>('/group-orders');
+};
 
-export const getOrders = () => axios.get(API_URL, {
-  headers: { Authorization: `Bearer ${getToken()}` }
-});
+export const createGroupOrder = async (productId: string, targetQty: number, quantity: number) => {
+  return await axios.post('/group-orders', { productId, targetQty, quantity });
+};
 
-export const createOrder = (data: any) => axios.post(API_URL, data, {
-  headers: { Authorization: `Bearer ${getToken()}` }
-}); 
+export const joinGroupOrder = async (groupOrderId: string, quantity: number) => {
+  return await axios.post('/group-orders/join', { groupOrderId, quantity });
+};

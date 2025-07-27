@@ -1,3 +1,5 @@
+import JoinOrderDialog from '@/components/JoinOrderDialog'; // Correct import path
+// Products.tsx
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { categories } from '@/data/mockData';
 import { Search, ShoppingCart, Package, IndianRupee } from 'lucide-react';
-import JoinOrderDialog from '@/components/JoinOrderDialog';
 import { Product } from '@/types';
 import * as productService from '../services/productService';
+import { toast } from '@/hooks/use-toast'; // Assuming you have a toast notification system
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,24 +19,31 @@ const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const res = await productService.getProducts();
+      setProducts(res.data as Product[]);
+    } catch (err: any) {
+      console.error("Failed to fetch products:", err.response?.data?.msg || err.message);
+      toast({
+        title: "Error fetching products",
+        description: err.response?.data?.msg || "Could not load products. Please try again.",
+        variant: "destructive"
+      });
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const res = await productService.getProducts();
-        setProducts(res.data as Product[]);
-      } catch (err) {
-        setProducts([] as Product[]);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchProducts();
   }, []);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.category.toLowerCase().includes(searchTerm.toLowerCase());
+                          product.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -42,6 +51,19 @@ const Products = () => {
   const handleJoinOrder = (product: Product) => {
     setSelectedProduct(product);
     setIsDialogOpen(true);
+  };
+
+  // This function will be passed to JoinOrderDialog's onOrderUpdated prop
+  // It will be called when an order is successfully joined or created in the dialog
+  const handleOrderUpdated = () => {
+    // After an order is updated, you might want to:
+    // 1. Re-fetch the products to update any group order progress displayed on this page.
+    // 2. Simply close the dialog.
+    // 3. Navigate to the Orders page.
+    // For now, let's re-fetch products and close the dialog.
+    fetchProducts(); 
+    setIsDialogOpen(false); // Close the dialog
+    // You could also show a success toast here if not already handled by the dialog
   };
 
   return (
@@ -153,6 +175,7 @@ const Products = () => {
           product={selectedProduct}
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
+          onOrderUpdated={handleOrderUpdated}
         />
       </div>
     </div>
