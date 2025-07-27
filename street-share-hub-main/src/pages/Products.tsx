@@ -1,20 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { mockProducts, categories } from '@/data/mockData';
+import { categories } from '@/data/mockData';
 import { Search, ShoppingCart, Package, IndianRupee } from 'lucide-react';
 import JoinOrderDialog from '@/components/JoinOrderDialog';
 import { Product } from '@/types';
+import * as productService from '../services/productService';
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredProducts = mockProducts.filter(product => {
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const res = await productService.getProducts();
+        setProducts(res.data as Product[]);
+      } catch (err) {
+        setProducts([] as Product[]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
@@ -64,59 +82,63 @@ const Products = () => {
         </div>
 
         {/* Products Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <Card key={product.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{product.name}</CardTitle>
-                    <CardDescription className="text-sm">
-                      by {product.supplierName}
-                    </CardDescription>
+        {loading ? (
+          <div className="text-center py-12">Loading products...</div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProducts.map((product) => (
+              <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{product.name}</CardTitle>
+                      <CardDescription className="text-sm">
+                        by {product.supplierName}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="secondary">{product.category}</Badge>
                   </div>
-                  <Badge variant="secondary">{product.category}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1">
-                    <IndianRupee className="w-4 h-4 text-primary" />
-                    <span className="text-xl font-bold text-primary">
-                      {product.pricePerKg}
-                    </span>
-                    <span className="text-muted-foreground">/{product.unit}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Min Order</div>
-                    <div className="font-semibold">
-                      {product.minOrderQty} {product.unit}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1">
+                      <IndianRupee className="w-4 h-4 text-primary" />
+                      <span className="text-xl font-bold text-primary">
+                        {product.pricePerKg}
+                      </span>
+                      <span className="text-muted-foreground">/{product.unit}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-muted-foreground">Min Order</div>
+                      <div className="font-semibold">
+                        {product.minOrderQty} {product.unit}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {product.description && (
-                  <p className="text-sm text-muted-foreground">{product.description}</p>
-                )}
+                  {product.description && (
+                    <p className="text-sm text-muted-foreground">{product.description}</p>
+                  )}
 
-                <div className="flex gap-2">
-                  <Button 
-                    className="flex-1"
-                    onClick={() => handleJoinOrder(product)}
-                  >
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    Join Group Order
-                  </Button>
-                  <Button variant="outline" size="icon">
-                    <Package className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1"
+                      onClick={() => handleJoinOrder(product)}
+                    >
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Join Group Order
+                    </Button>
+                    <Button variant="outline" size="icon">
+                      <Package className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
-        {filteredProducts.length === 0 && (
+        {filteredProducts.length === 0 && !loading && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No products found</h3>

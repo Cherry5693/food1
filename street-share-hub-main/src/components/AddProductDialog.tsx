@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import * as productService from '../services/productService';
+import * as orderService from '../services/orderService';
 
 interface AddProductDialogProps {
   isOpen: boolean;
@@ -53,13 +55,25 @@ const AddProductDialog: React.FC<AddProductDialogProps> = ({ isOpen, onClose }) 
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Prepare the product data
+      const productData = {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.pricePerKg),
+        image: '', // Add image support if needed
+        category: formData.category,
+        unit: formData.unit,
+        minOrderQty: parseInt(formData.minOrderQty, 10),
+      };
+
+      await productService.createProduct(productData);
+
       toast({
         title: "Product Added Successfully!",
         description: `${formData.name} has been added to your product catalog`,
       });
-      
+
       // Reset form
       setFormData({
         name: '',
@@ -69,10 +83,17 @@ const AddProductDialog: React.FC<AddProductDialogProps> = ({ isOpen, onClose }) 
         minOrderQty: '',
         description: ''
       });
-      
+
       setIsLoading(false);
       onClose();
-    }, 1000);
+    } catch (err: any) {
+      toast({
+        title: "Failed to Add Product",
+        description: err.response?.data?.msg || "An error occurred.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   const handleClose = () => {

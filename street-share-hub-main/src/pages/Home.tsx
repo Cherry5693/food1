@@ -86,7 +86,7 @@ const Home = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center">
+              <div key={`stat-${stat.label}`} className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">{stat.value}</div>
                 <div className="text-muted-foreground">{stat.label}</div>
               </div>
@@ -109,7 +109,7 @@ const Home = () => {
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
-              <Card key={index} className="text-center hover:shadow-lg transition-shadow">
+              <Card key={`feature-${feature.title}`} className="text-center hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4 text-primary">
                     {feature.icon}

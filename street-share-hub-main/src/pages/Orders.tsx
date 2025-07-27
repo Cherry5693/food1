@@ -1,18 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockGroupOrders } from '@/data/mockData';
 import { useAuth } from '@/context/AuthContext';
 import { GroupOrder } from '@/types';
-import { 
-  ShoppingCart, 
-  Clock, 
-  CheckCircle, 
-  Truck, 
-  Users, 
+import * as orderService from '../services/orderService';
+import {
+  ShoppingCart,
+  Clock,
+  CheckCircle,
+  Truck,
+  Users,
   Calendar,
   IndianRupee,
   Package
@@ -20,10 +20,27 @@ import {
 
 const Orders = () => {
   const { user } = useAuth();
-  
+  const [orders, setOrders] = useState<GroupOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const res = await orderService.getOrders();
+        setOrders(res.data as GroupOrder[]);
+      } catch (err) {
+        setOrders([] as GroupOrder[]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
   // Filter orders for current user
-  const userOrders = mockGroupOrders.filter(order => 
-    order.participants.includes(user?.id || '')
+  const userOrders = orders.filter(order =>
+    order.participants?.includes(user?.id || '')
   );
 
   const getStatusIcon = (status: string) => {
@@ -104,7 +121,7 @@ const Orders = () => {
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="flex items-center space-x-1">
               <Users className="w-4 h-4 text-muted-foreground" />
-              <span>{order.participants.length} members</span>
+              <span>{order.participants?.length || 0} members</span>
             </div>
             <div className="flex items-center space-x-1">
               <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -196,7 +213,9 @@ const Orders = () => {
           </TabsList>
           
           <TabsContent value="active" className="space-y-6">
-            {activeOrders.length > 0 ? (
+            {loading ? (
+              <div className="text-center py-12">Loading orders...</div>
+            ) : activeOrders.length > 0 ? (
               <div className="grid lg:grid-cols-2 gap-6">
                 {activeOrders.map((order) => (
                   <OrderCard key={order.id} order={order} />

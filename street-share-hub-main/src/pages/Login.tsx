@@ -104,7 +104,7 @@ const Login = () => {
           <CardContent className="space-y-2">
             {demoCredentials.map((cred, index) => (
               <Button
-                key={index}
+                key={`demo-${cred.email}`}
                 variant="ghost"
                 className="w-full justify-start text-left p-2 h-auto"
                 onClick={() => {

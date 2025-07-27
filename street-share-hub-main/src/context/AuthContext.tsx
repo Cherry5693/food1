@@ -1,128 +1,75 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthState } from '@/types';
 import { toast } from '@/hooks/use-toast';
+import * as authService from '../services/authService';
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
-
-// Mock users for demonstration
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: '1',
-    name: 'Raj Sharma',
-    email: 'raj@vendor.com',
-    password: 'password',
-    role: 'vendor',
-    location: 'Mumbai, Maharashtra',
-    phone: '+91 9876543210'
-  },
-  {
-    id: '2',
-    name: 'Priya Suppliers',
-    email: 'priya@supplier.com',
-    password: 'password',
-    role: 'supplier',
-    location: 'Delhi, NCR',
-    phone: '+91 9876543211'
-  },
-  {
-    id: '3',
-    name: 'Amit Kumar',
-    email: 'amit@vendor.com',
-    password: 'password',
-    role: 'vendor',
-    location: 'Bangalore, Karnataka',
-    phone: '+91 9876543212'
-  }
-];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in on app start
+    // Check for token and user on app start
+    const token = authService.getToken();
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
+    if (token && savedUser) {
       setUser(JSON.parse(savedUser));
       setIsAuthenticated(true);
     }
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    const foundUser = mockUsers.find(u => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      const userWithoutPassword = {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role,
-        location: foundUser.location,
-        phone: foundUser.phone
-      };
-      
-      setUser(userWithoutPassword);
+    try {
+      const res = await authService.login({ email, password });
+      const { token, user: userData } = res.data as { token: string; user: User };
+      authService.setToken(token);
+      setUser(userData);
       setIsAuthenticated(true);
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-      
+      localStorage.setItem('user', JSON.stringify(userData));
       toast({
-        title: "Login Successful",
-        description: `Welcome back, ${foundUser.name}!`,
+        title: 'Login Successful',
+        description: `Welcome back, ${userData.name}!`,
       });
-      
       return true;
-    } else {
+    } catch (err: any) {
       toast({
-        title: "Login Failed",
-        description: "Invalid email or password",
-        variant: "destructive",
+        title: 'Login Failed',
+        description: err.response?.data?.msg || 'Invalid email or password',
+        variant: 'destructive',
       });
       return false;
     }
   };
 
   const register = async (userData: Omit<User, 'id'> & { password: string }): Promise<boolean> => {
-    // Check if user already exists
-    const existingUser = mockUsers.find(u => u.email === userData.email);
-    if (existingUser) {
+    try {
+      await authService.register(userData);
+      // Optionally, auto-login after registration
+      await login(userData.email, userData.password);
       toast({
-        title: "Registration Failed",
-        description: "User with this email already exists",
-        variant: "destructive",
+        title: 'Registration Successful',
+        description: `Welcome, ${userData.name}!`,
+      });
+      return true;
+    } catch (err: any) {
+      toast({
+        title: 'Registration Failed',
+        description: err.response?.data?.msg || 'Registration error',
+        variant: 'destructive',
       });
       return false;
     }
-
-    // In a real app, this would make an API call
-    const newUser = {
-      id: Date.now().toString(),
-      name: userData.name,
-      email: userData.email,
-      role: userData.role,
-      location: userData.location,
-      phone: userData.phone
-    };
-
-    mockUsers.push({ ...newUser, password: userData.password });
-    setUser(newUser);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(newUser));
-
-    toast({
-      title: "Registration Successful",
-      description: `Welcome, ${newUser.name}!`,
-    });
-
-    return true;
   };
 
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
+    authService.removeToken();
     localStorage.removeItem('user');
     toast({
-      title: "Logged Out",
-      description: "See you soon!",
+      title: 'Logged Out',
+      description: 'See you soon!',
     });
   };
 
